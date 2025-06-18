@@ -1,0 +1,205 @@
+<!-- Updated Virtual Try-On HTML with Working JavaScript and Proper IDs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Virtual Try-On Studio</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #f0f2f5, #e0eafc);
+    }
+    .container {
+      max-width: 650px;
+      background: white;
+      padding: 30px;
+      margin: 40px auto;
+      border-radius: 15px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 25px;
+    }
+    label {
+      font-weight: 600;
+      margin-top: 15px;
+      display: block;
+    }
+    input[type="text"], select {
+      width: 100%;
+      padding: 10px 12px;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #4CAF50;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #cameraContainer {
+      margin-top: 30px;
+      text-align: center;
+    }
+    video, canvas {
+      width: 640px;
+      height: 480px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎭 Virtual Try-On Studio</h2>
+
+    <label for="gender">👤 Select Gender</label>
+    <select id="gender">
+      <option value="">-- Select Gender --</option>
+      <option value="male">👨 Male</option>
+      <option value="female">👩 Female</option>
+    </select>
+
+    <label for="upperWearURL">👔 Upper Wear</label>
+    <input type="text" id="upperWearURL" placeholder="Image URL for upper wear (e.g., shirt)">
+
+    <label for="bottomWearURL">👖 Bottom Wear</label>
+    <input type="text" id="bottomWearURL" placeholder="Image URL for bottom wear (e.g., pants)">
+
+    <label for="glassesURL">🕶️ Glasses</label>
+    <input type="text" id="glassesURL" placeholder="Optional glasses image URL">
+
+    <label for="shoesURL">👟 Shoes</label>
+    <input type="text" id="shoesURL" placeholder="Optional shoes image URL">
+
+    <button id="startButton">🎬 Start Virtual Try-On</button>
+
+    <div id="cameraContainer" style="display:none">
+      <video id="video" autoplay muted></video>
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- MediaPipe Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.5/drawing_utils.min.js"></script>
+
+  <script>
+    const upperImg = new Image();
+    const bottomImg = new Image();
+    const glassesImg = new Image();
+    const shoesImg = new Image();
+
+    document.getElementById("startButton").addEventListener("click", async () => {
+      const gender = document.getElementById("gender").value;
+      const upperWearURL = document.getElementById("upperWearURL").value;
+      const bottomWearURL = document.getElementById("bottomWearURL").value;
+      const glassesURL = document.getElementById("glassesURL").value;
+      const shoesURL = document.getElementById("shoesURL").value;
+
+      if (!upperWearURL && !bottomWearURL && !glassesURL && !shoesURL) {
+        alert("Please add at least one clothing item to try on!");
+        return;
+      }
+
+      if (upperWearURL) upperImg.src = upperWearURL;
+      if (bottomWearURL) bottomImg.src = bottomWearURL;
+      if (glassesURL) glassesImg.src = glassesURL;
+      if (shoesURL) shoesImg.src = shoesURL;
+
+      document.getElementById("cameraContainer").style.display = "block";
+
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+
+      const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${file}`
+      });
+
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      pose.onResults((results) => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+        if (!results.poseLandmarks) return;
+        const lm = results.poseLandmarks;
+
+        // Upper wear
+        if (upperImg.src && lm[11] && lm[12]) {
+          const x = ((lm[11].x + lm[12].x) / 2) * canvas.width;
+          const y = ((lm[11].y + lm[12].y) / 2) * canvas.height;
+          const w = Math.abs(lm[12].x - lm[11].x) * canvas.width * 1.5;
+          const h = w * 1.4;
+          ctx.drawImage(upperImg, x - w / 2, y - h / 2.5, w, h);
+        }
+
+        // Bottom wear
+        if (bottomImg.src && lm[23] && lm[24]) {
+          const x = ((lm[23].x + lm[24].x) / 2) * canvas.width;
+          const y = ((lm[23].y + lm[24].y) / 2) * canvas.height;
+          const w = Math.abs(lm[24].x - lm[23].x) * canvas.width * 1.4;
+          const h = w * 1.7;
+          ctx.drawImage(bottomImg, x - w / 2, y - h * 0.1, w, h);
+        }
+
+        // Glasses
+        if (glassesImg.src && lm[2] && lm[5]) {
+          const x = ((lm[2].x + lm[5].x) / 2) * canvas.width;
+          const y = ((lm[2].y + lm[5].y) / 2) * canvas.height;
+          const w = Math.abs(lm[2].x - lm[5].x) * canvas.width * 2;
+          const h = w * 0.5;
+          ctx.drawImage(glassesImg, x - w / 2, y - h / 2, w, h);
+        }
+
+        // Shoes
+        if (shoesImg.src && lm[27] && lm[28]) {
+          const x = ((lm[27].x + lm[28].x) / 2) * canvas.width;
+          const y = ((lm[27].y + lm[28].y) / 2) * canvas.height;
+          const w = Math.abs(lm[28].x - lm[27].x) * canvas.width * 2;
+          const h = w * 0.6;
+          ctx.drawImage(shoesImg, x - w / 2, y - h / 2, w, h);
+        }
+      });
+
+      const camera = new Camera(video, {
+        onFrame: async () => {
+          await pose.send({ image: video });
+        },
+        width: 640,
+        height: 480
+      });
+
+      camera.start();
+    });
+  </script>
+</body>
+</html>
